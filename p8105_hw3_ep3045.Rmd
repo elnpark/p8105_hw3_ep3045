@@ -1,0 +1,193 @@
+---
+title: "p8105_hw3_ep3045"
+author: "Ellen Park"
+date: "2022-10-11"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r setup two, include = FALSE}
+library(tidyverse)
+library(p8105.datasets)
+knitr::opts_chunk$set(
+  fig.width = 6,
+  fig.asp = 0.6,
+  out.width = "90%"
+)
+theme_set(theme_bw() + theme(legend.position = "bottom"))
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+scale_colour_discrete = scale_color_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+```
+
+## Problem 1
+
+```{r}
+data("instacart")
+instacart_df <-
+  instacart %>% 
+  janitor::clean_names()
+```
+
+#### Instacart data exploration 
+
+*Finding rows, columns, and key variables*
+
+```{r intstacart rows cols names}
+instacart_rows = instacart_df %>% 
+  nrow()
+instacart_cols = instacart_df %>% 
+  ncol()
+instacart_names = instacart_df %>% 
+  names()
+```
+
+The number of rows in the instacart data set is **`r instacart_rows`**. The number of columns in the instacart data set is **`r instacart_cols`**. The key variables in the instacart data set are **`r instacart_names`**.
+
+*Finding how many aisles there are and which aisles are the most items ordered from*
+
+```{r instacart aisles}
+instacart_aisles <- 
+  instacart_df %>% 
+  group_by(aisle) %>% 
+  summarize(n_obs = n()) %>% 
+  arrange(desc(n_obs))
+instacart_aisles
+```
+
+As seen above, there are 134 aisles, and the aisles that have the most items ordered from are the "fresh vegetables", "fresh fruits", "packaged vegetable fruits", "yogurt", and "packaged cheese". 
+
+
+*Creating a table showing the three most popular items in each of the aisles “baking ingredients”, “dog food care”, and “packaged vegetables fruits”, including the number of times each item is ordered*
+
+```{r aisle table}
+aisle_table <- 
+  instacart_df %>% 
+  group_by(aisle) %>% 
+  summarize(item_count = n()) %>% 
+  filter(item_count > 10000) %>% 
+  ggplot(aes(x = reorder(aisle, item_count), 
+             y = item_count)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Items ordered per Aisle",
+    x = "Aisle",
+    y = "# of Items",
+    caption = "Figure 1. The table depicts the number of items ordered per aisle (>10000 items)."
+  ) +
+  coord_flip() +
+  theme(axis.text.y = element_text(size = 6))
+aisle_table
+```
+
+*Making a table showing the three most popular items in each of the aisles “baking ingredients”, “dog food care”, and “packaged vegetables fruits", including the number of times each item is ordered*
+
+```{r popular_items_table, message = FALSE, warning = FALSE}
+popular_table <- 
+  instacart_df %>% 
+  filter(aisle %in% c("baking ingredients", "dog food care", "packaged vegetables fruits")) %>% 
+  group_by(aisle, product_name) %>% 
+  summarize(item_count = n()) %>% 
+  filter(min_rank(desc(item_count)) < 4) %>% 
+  arrange(desc(item_count)) 
+  
+knitr::kable(popular_table)
+```
+
+## Problem 2
+
+*Loading accelerometer data set*
+
+```{r}
+accel_df <- 
+  read_csv("./data/accel_data.csv") %>%
+  janitor::clean_names() 
+```
+
+*Tidying data set*
+
+```{r}
+accel_tidy <-
+  accel_df %>%
+  pivot_longer(
+    activity_1:activity_1440,
+    names_to = "minute",
+    names_prefix = "activity_",
+    values_to = "activity_count") %>%
+  mutate(
+    week = as.integer(week), 
+    day_id = as.integer(day_id), 
+    minute = as.integer(minute),
+    hour = as.integer(minute %/% 60), 
+    day = factor(day, levels = c("Sunday","Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")),
+    weekday_vs_weekend = 
+      case_when(
+           day %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday") ~ "Weekday", 
+           day %in% c("Saturday", "Sunday") ~ "Weekend")) 
+```
+ 
+*Analyzing accelerometer data*
+
+```{r}
+accel_var = accel_tidy %>% 
+  names()
+accel_dim = accel_tidy %>% 
+  dim()
+accel_rows = accel_tidy %>% 
+  nrow()
+accel_cols = accel_tidy %>% 
+  ncol()
+```
+
+This data set was tidied, and we found that its key variables are **`r accel_var`**. Additionally, the dimensions are **`r accel_dim`**, the number of columns are **`r accel_cols`**, and the number of rows are **`r accel_rows`**. 
+
+*Creating a table that shows total activity count for each day of the week*
+
+```{r}
+accel_tidy %>%
+  group_by(day) %>%
+  summarize(total_activity = sum(activity_count, na.rm = TRUE)) %>%
+  knitr::kable(caption = 
+      "Figure 2. Total Activity Count per Day"
+  )
+```
+
+One apparent trend seen from the table is that activity count is noticeably higher towards the end of the week, from Wednesday to Friday. Additionally, Saturday can be assumed to be a rest day, as it is significantly lower in total activity compared to the rest of the days. 
+
+*Making a single-panel plot that depicts 24-hour activity time courses for every day*
+
+```{r}
+accel_tidy %>%
+  group_by(day, minute) %>%
+  ggplot(aes(x = minute, 
+             y = activity_count, 
+             color = day)) +
+  geom_point() +
+  labs(
+    title = "24-Hour Activity Time per Day",
+    x = "Hour in the Day",
+    y = "Activity Count",
+    caption = "Figure 3. The following data is from  Columbia University Medical Center") + 
+  scale_x_continuous(
+    breaks = c(0, 240, 480, 720, 960, 1200, 1440),
+    labels = c("0 hr", "4 hr", "8 hr", "12 hr", "16 hr", "20 hr", "24 hr"))
+```
+
+This accelerometer data set is tidied. It shows five weeks of data for one person.
+
+Based on this plot, we can see that activity count is higher later on throughout the day during weekdays. On the weekends, however, we can see that activity count is actually higher throughout the middle of the day. 
+
+#Problem 3
+
+```{r noaa}
+library(p8105.datasets)
+data("ny_noaa")
+```
+
