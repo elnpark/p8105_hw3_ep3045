@@ -7,6 +7,15 @@ output: html_document
 
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+setwd("~/COLUMBIA/Fall 2022/DATA SCIENCE/p8105_hw3_ep3045")
+install.packages(hexbin)
+library(tidyverse)
+library(ggplot2)
+library(p8105.datasets) 
+library(knitr)
+library(lubridate)
+library(ggpubr)
+
 ```
 
 
@@ -107,7 +116,7 @@ knitr::kable(popular_table)
 
 ```{r}
 accel_df <- 
-  read_csv("./data/accel_data.csv") %>%
+  read_csv("accel_data.csv") %>%
   janitor::clean_names() 
 ```
 
@@ -185,9 +194,71 @@ This accelerometer data set is tidied. It shows five weeks of data for one perso
 Based on this plot, we can see that activity count is higher later on throughout the day during weekdays. On the weekends, however, we can see that activity count is actually higher throughout the middle of the day. 
 
 #Problem 3
-
 ```{r noaa}
-library(p8105.datasets)
 data("ny_noaa")
+ny_noaa <- ny_noaa %>%
+  mutate(prcp = prcp/10,
+         snow = snow/10,
+         snwd = snwd/10,
+         tmax = as.numeric(tmax)/10,
+         tmin = as.numeric(tmin)/10,
+         year = year(date),
+         month = month(date),
+         day = weekdays(date))
+#summary(ny_noaa$date) -- everyday 1/1/81 - 12/31/10
+```
+
+The ny_noaa dataset is quite large, `r nrow(ny_noaa)` observations with `r ncol(ny_noaa)` variables. A little breakdown of each variable:
+- There are `r length(unique(ny_noaa$id))` unique different id's in this dataset.
+- Dates range for a 30 year span from January 1st, 1981 to December 31st, 2010. 
+
+```{r}
+kable(t(apply(ny_noaa[,3:7], 2, summary)))
+```
+
+It seems NAs are quite an issue across most of the numerical variables but especially so in the temperature columns, where almost half of the values are NA's. 
+
+```{r problem 3 snow}
+ny_noaa %>%
+  group_by(snow) %>%
+  count(snow)
+```
+
+The most observed snowfall value is 0 which is unsurprising, considering it does not snow for *most* of the year. 
+
+####Make a two-panel plot showing the average temperature in January and in July in each station across years. Is there any observable / interpretable structure? Any outliers?
+```{r Tmax_mean plot}
+ny_noaa %>%
+  filter(month %in% c(1,7)) %>%
+  group_by(year, month, id) %>%
+  summarize(mean_max_temp = mean(tmax)) %>%
+  ggplot(., aes(x = year, y = mean_max_temp, color = id)) + 
+  geom_line() +
+  theme(legend.position="none") +
+  facet_grid(~month)
+```
+
+I would not say there is any sort of particular interpretable structure beyond the fact that you can see that temperature varies within stations on a per year basis and that on average the weather stays within a ~20 degrees Celsius window throughout the years for borth January and July as a whole. There does seem to be one outlier though from one stayion in the late 80s in July that dipped much lower than usual. 
+
+
+####Make a two-panel plot showing (i) tmax vs tmin for the full dataset (note that a scatterplot may not be the best option); and (ii) make a plot showing the distribution of snowfall values greater than 0 and less than 100 separately by year.
+```{r 2 panel snow temp}
+funky_temps <- ny_noaa[which(ny_noaa$tmin > ny_noaa$tmax),]
+temp_plot <- ggplot(ny_noaa, aes(x = tmin, y = tmax)) + 
+  geom_hex() +
+  xlim(-60, 60) +
+  ylim(-60, 60)
+  geom_abline(intercept = 0, slope = 1, color = "red") 
+snow_plot <- ny_noaa %>%
+  filter(snow > 0 & snow < 100) %>%
+  mutate(year = as.factor(year)) %>%
+  ggplot(., aes(x = year, y = snow)) +
+  geom_boxplot() + 
+  coord_flip()
+ggarrange(temp_plot, snow_plot, ncol = 2, nrow = 1)
+```
+
+For the first panel, the tmax vs tmin plot, there were over a million values to be plotted so it was better to use a density-based plot. It is interesting to see that there are a decent amount of values where tmin seems to be great than tmax (anything right of the y = x line). This does not make much sense, in fact there are `r nrow(funky_temps)` observations where this is seen. For the sefcond panel, we see that there is a lot of outliers in in all years but in general the IQR (along with the median) stays pretty consistent throughout the years. 
+
 ```
 
